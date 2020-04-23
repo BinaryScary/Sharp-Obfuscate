@@ -1,4 +1,4 @@
-# C-Obfuscate
+# Sharp-Obfuscate
 Obfuscate C# Function, Parameter, and Variable Names
 ```
 usage: Obfuscator.py [-h] [-o OutFile] File
