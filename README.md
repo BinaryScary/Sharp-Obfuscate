@@ -1,6 +1,6 @@
 # Sharp-Obfuscate
-Obfuscate C# Function, Parameter, Variable Names, and Encode Strings
-Evades Windows Defender
+Obfuscate C# Function, Parameter, Variable Names, and Encode Strings\
+Fully Evades Windows Defender and AMSI Signatures
 ```
 usage: Obfuscator.py [-h] [-o OutFile] File
 
