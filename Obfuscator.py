@@ -52,7 +52,39 @@ def obfuscateNames(code,variables):
         if len(var) <= 5:
             continue
         # check for non encapsulated word
-        obf = re.sub("( |\)|\.|\(|\[|,|\t{1})"+var+"( |\-|\+|\.|\n|\(|\)|;|,|=|\[|\]|\t{2})",r"\1"+obfuWord()+r"\2",obf)
+        obf = re.sub("( |\)|\.|\(|\[|,|\t)"+var+"( |\-|\+|\.|\n|\(|\)|;|,|=|\[|\]|\t)",r"\1"+obfuWord()+r"\2",obf)
+    return obf
+
+def strToBytes(s):
+    return "-".join("{:02x}".format(ord(c)) for c in s)
+
+# csharp literal strings dereference double quotes to singles
+def trimDoubleQuotes(s):
+    return re.sub('""','"',s)
+
+def strToCall(s):
+    # s.group(1) returns the first subgroup '()'
+    return 'DecObfu("'+strToBytes(trimDoubleQuotes(s.group(1)))+'")'
+
+def obfuscateStrings(code):
+    decFunc = """
+	public static string DecObfu(string enc){
+		String[] arr = enc.Split('-');
+		if(arr[0] == ""){return "";}
+		byte[] array = new byte[arr.Length];
+		for(int i=0; i<arr.Length; i++) array[i]=Convert.ToByte(arr[i],16);
+		string dec = Encoding.UTF8.GetString(array);	
+		return dec;
+	}
+    """
+    obf = code
+    obf = "using System.Text;\n"+obf
+    # include newlines in regex for multiline strings?
+    # calls strToCall function with match-object
+    obf = re.sub('@"(.*?)(?<!")"(?!")',strToCall,obf)
+        # group 1 (), not include " before or after(?<!")"(?!"), lazy match first occurance .*?
+    # TODO: obfuscate DecObfu
+    obf = re.sub('}([\s\S][^\[]*?)public static void','}'+decFunc+r"\1"+'public static void',obf,1)
     return obf
 
 
@@ -72,7 +104,9 @@ if __name__ == "__main__":
 
     variables = getNames(code)
 
-    obf = obfuscateNames(code,variables)
+    obfTemp = obfuscateNames(code,variables)
+
+    obf = obfuscateStrings(obfTemp)
 
     if args.o == None:
         print(obf)
