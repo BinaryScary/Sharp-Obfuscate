@@ -4,10 +4,14 @@ import string
 import re
 import random
 import argparse
+import codecs
 
 # change to accomidate false positives in declarations
 blacklist = ["using", "goto"]
 
+decodeFunc = "DecObfu"
+
+# TODO: add a data struct to catch if same obfuscated name is used again
 # return random obfuscated names
 def obfuWord(length=10):
     allLetters = string.ascii_letters
@@ -62,13 +66,22 @@ def strToBytes(s):
 def trimDoubleQuotes(s):
     return re.sub('""','"',s)
 
+def escapeChars(s):
+    return codecs.decode(s,"unicode-escape")
+
+# literal string to function call
+def litStrToCall(s):
+    # s.group(1) returns the first subgroup '()'
+    return decodeFunc+'("'+strToBytes(trimDoubleQuotes(s.group(1)))+'")'
+
+# string to function call (escapes characters)
 def strToCall(s):
     # s.group(1) returns the first subgroup '()'
-    return 'DecObfu("'+strToBytes(trimDoubleQuotes(s.group(1)))+'")'
+    return decodeFunc+'("'+strToBytes(trimDoubleQuotes(escapeChars(s.group(1))))+'")'
 
 def obfuscateStrings(code):
     decFunc = """
-	public static string DecObfu(string enc){
+	public static string %s(string enc){
 		String[] arr = enc.Split('-');
 		if(arr[0] == ""){return "";}
 		byte[] array = new byte[arr.Length];
@@ -76,14 +89,21 @@ def obfuscateStrings(code):
 		string dec = Encoding.UTF8.GetString(array);	
 		return dec;
 	}
-    """
+    """ % decodeFunc
     obf = code
     obf = "using System.Text;\n"+obf
-    # include newlines in regex for multiline strings?
+
+    # string literal @"" obfuscate
     # calls strToCall function with match-object
-    obf = re.sub('@"(.*?)(?<!")"(?!")',strToCall,obf)
-        # group 1 (), not include " before or after(?<!")"(?!"), lazy match first occurance .*?
-    # TODO: obfuscate DecObfu
+    obf = re.sub('@"(?!")((.|\s)*?)(?<!")"(?!")',litStrToCall,obf,re.DOTALL)
+        # group 1 (), not include " before or after(?<!")"(?!"), lazy match first occurance .*?, \s include newline
+
+    # normal string "" obfuscate
+    # need to be done after literals since multiline screws with reg strings
+    # TODO: don't match inside DecObfu strings
+    obf = re.sub('(?<!(?:@|"))"(?!")(.*?)(?<!")"(?!")',strToCall,obf)
+        # don't capture group (?:)
+
     obf = re.sub('}([\s\S][^\[]*?)public static void','}'+decFunc+r"\1"+'public static void',obf,1)
     return obf
 
@@ -97,16 +117,18 @@ if __name__ == "__main__":
 
     try:
         with open(args.filename,'r') as myfile:
-            code = myfile.read()
+            obf = myfile.read()
     except:
         print("[!] Error opening %s" % args.filename)
         quit()
+    
+    decodeFunc = obfuWord()
 
-    variables = getNames(code)
+    variables = getNames(obf)
 
-    obfTemp = obfuscateNames(code,variables)
+    obf = obfuscateNames(obf,variables)
 
-    obf = obfuscateStrings(obfTemp)
+    obf = obfuscateStrings(obf)
 
     if args.o == None:
         print(obf)
