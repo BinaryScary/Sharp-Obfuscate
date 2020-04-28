@@ -2,12 +2,12 @@
 Obfuscate C# Function, Parameter, Variable Names and Encode Strings\
 Fully Evades Windows Defender and AMSI Signatures
 ```
-usage: CodeObfuscator.py [-h] File
+usage: CodeObfuscator.py [-h] SolutionFile
 
-Obfuscate C# Function,Parameter, Variable Names and Encode Strings
+Obfuscate C# Function,Parameter, Variable Names and Encode Strings.
 
 positional arguments:
-  File
+  SolutionFile
 
 optional arguments:
   -h, --help  show this help message and exit
