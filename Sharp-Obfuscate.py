@@ -11,7 +11,8 @@ import shutil
 # blacklist for false positives in declaration (will not search any line including these for names to obfuscate, will also blacklist any vars in those lines)
 blacklist = ["using", "goto", "extern","override","partial"]
 # blacklist for strings precursors (will not add string precursed with this)
-strBlacklist = ['DllImport\(','DllExport\(','\[Guid\(','\[ProgId\(','case '] 
+# strBlacklist = ['DllImport','DllExport','Guid','ProgId','case'] 
+strBlacklist = ['DllImport','DllExport\(','\[Guid\(','\[ProgId\(','case '] 
 # blacklist for function and parameter names
 funcBlacklist = [] 
 
@@ -83,32 +84,39 @@ def litStrToCall(s):
 
 # string to function call (escapes characters)
 def strToCall(s):
+    global strBlacklist
+    # if any(word in s.string for word in strBlacklist):
+    #     return s.group(0)
+    #     # s.string returns whole string sent to match
+    # else:
     # s.group(1) returns the first subgroup '()'
-    if s.group(1) != "":
+    if s.group("Head") != "":
+        return s.group(0)
+    if s.group("Black") != "":
         return s.group(0)
     else:
-        return decodeFunc+'("'+strToBytes(trimDoubleQuotes(escapeChars(s.group(2))))+'")'
+        return decodeFunc+'("'+strToBytes(trimDoubleQuotes(escapeChars(s.group("Content"))))+'")'
 
 # all blacklist items get added to group 1, if strToCall sees group1 has a string it does not modify
 # TODO: redo string replacement function, needs context when string is found
 def genRegString(blacklist):
-    regPrepend = r'(?<!(?:@|"|\$|\\))"(?!")(.*?)(?<!\\)"(?!"|\\)'
+    # regPrepend = r'(?<!(?:@|"|\$|\\))"(?!")(.*?)(?<!\\)"(?!"|\\)'
+    regPrepend = r'(?<!$")(?P<Head>@|\$|)(?<!(?:"|\\))"(?!")(?P<Content>.*?)(?<!\\)"(?!"|\\)'
+        # ?P<name> name the group match
     # add words as optionals to the front of regex string
     regex = ""
     for word in blacklist:
         regex += word+'|'
-    regex = '('+regex+')'+regPrepend
+    regex = '(?P<Black>'+regex+')'+regPrepend
     return regex
 
 def obfuscateStrings(code):
-    # generate decode Function name
-    global decodeFunc
-    global strBlacklist
+    # global strBlacklist
 
     obf = code
 
     # string literal @"" obfuscate
-    # calls strToCall function with match-object
+    # calls strToCall function with match-object, replaces every occurance, if occurances overlap, only one is taken since regex happens iteratively
     obf = re.sub('@"(?!")((.|\s)*?)(?<!")"(?!")',litStrToCall,obf,re.DOTALL)
         # group 1 (), not include " before or after(?<!")"(?!"), lazy match first occurance .*?, \s include newline
 
@@ -116,6 +124,7 @@ def obfuscateStrings(code):
     regString = genRegString(strBlacklist)
     # normal string "" obfuscate
     # need to be done after literals since multiline screws with reg strings
+    # obf = re.sub(r'(?<!(?:@|"|\$|\\))"(?!")(.*?)(?<!\\)"(?!"|\\)',strToCall,obf)
     obf = re.sub(regString,strToCall,obf)
         # don't capture group (?:)
     
