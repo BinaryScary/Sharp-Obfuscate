@@ -11,7 +11,7 @@ import shutil
 # blacklist for false positives in declaration (will not search any line including these for names to obfuscate, will also blacklist any vars in those lines)
 blacklist = ["using", "goto", "extern","override","partial"]
 # blacklist for strings precursors (will not add string precursed with this)
-strBlacklist = ['DllImport\(','DllExport\(','\[Guid\(','\[ProgId\('] 
+strBlacklist = ['DllImport\(','DllExport\(','\[Guid\(','\[ProgId\(','case '] 
 # blacklist for function and parameter names
 funcBlacklist = [] 
 
@@ -27,7 +27,7 @@ def obfuWord(length=10):
 
 # parse function parameters and names
 def addFunc(funcLine):
-    match = re.findall("(?<= )(?<!\<)([a-zA-Z0-9_]+,|[a-zA-Z0-9_]+\)|[a-zA-Z0-9_]+\()",funcLine)
+    match = re.findall("(?<= )(?<!new )(?<!\<)([a-zA-Z0-9_]+,|[a-zA-Z0-9_]+\)|[a-zA-Z0-9_]+\()",funcLine)
         # (?<= ) check if space is present without adding to match
     variables = []
     for variable in match:
@@ -89,8 +89,10 @@ def strToCall(s):
     else:
         return decodeFunc+'("'+strToBytes(trimDoubleQuotes(escapeChars(s.group(2))))+'")'
 
+# all blacklist items get added to group 1, if strToCall sees group1 has a string it does not modify
+# TODO: redo string replacement function, needs context when string is found
 def genRegString(blacklist):
-    regPrepend = '(?<!(?:@|"))"(?!")(.*?)(?<!")"(?!")'
+    regPrepend = r'(?<!(?:@|"|\$|\\))"(?!")(.*?)(?<!\\)"(?!"|\\)'
     # add words as optionals to the front of regex string
     regex = ""
     for word in blacklist:
@@ -102,36 +104,23 @@ def obfuscateStrings(code):
     # generate decode Function name
     global decodeFunc
     global strBlacklist
-    strBlacklist.append(decodeFunc+'\(')
 
-    # decFunc = """
-	# public static string %s(string enc){
-	# 	String[] arr = enc.Split('-');
-	# 	if(arr[0] == ""){return "";}
-	# 	byte[] array = new byte[arr.Length];
-	# 	for(int i=0; i<arr.Length; i++) array[i]=Convert.ToByte(arr[i],16);
-	# 	string dec = Encoding.UTF8.GetString(array);	
-	# 	return dec;
-	# }
-    # """ % decodeFunc
     obf = code
-    # TODO: obfuscate obfuscation class name
-    # obf = "using static Obfu.Obfu;"+obf
-    # obf = "using System.Text;\nusing System;\n"+obf
 
     # string literal @"" obfuscate
     # calls strToCall function with match-object
     obf = re.sub('@"(?!")((.|\s)*?)(?<!")"(?!")',litStrToCall,obf,re.DOTALL)
         # group 1 (), not include " before or after(?<!")"(?!"), lazy match first occurance .*?, \s include newline
 
-    # generate a regex string with blacklisted words
+    # generate a regex pattern with blacklisted words
     regString = genRegString(strBlacklist)
     # normal string "" obfuscate
     # need to be done after literals since multiline screws with reg strings
     obf = re.sub(regString,strToCall,obf)
         # don't capture group (?:)
+    
+    # TODO: interpolated Strings $""
 
-    # obf = re.sub('(class (?:.|\s)*?{)',r'\1'+"\n\t\t"+decFunc,obf,1)
     return obf
 
 def getFilenames(projNames):
@@ -281,6 +270,7 @@ def addDecoder(projNames,filenames):
             print("[!] Error writing %s" % path)
             quit()
             
+        # TODO: obfuscate obfuscation class/file name
         # add decoder file to projects
         directory = os.path.dirname(path)
         path = os.path.join(directory,"Obfu.cs")
@@ -324,7 +314,10 @@ namespace Obfu
 def copyProj(solution):
     # create new obfuscated project
     dirOrig = os.path.dirname(solution)
-    dirObfu = dirOrig+"Obfucated"
+    dirObfu = dirOrig+"Obfuscated"
+
+    # if os.path.exists(dirObfu):
+    #     shutil.rmtree(dirObfu)
     shutil.copytree(dirOrig,dirObfu)
 
     return os.path.join(dirObfu,os.path.basename(solution))
