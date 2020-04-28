@@ -6,6 +6,7 @@ import random
 import argparse
 import codecs
 import shutil
+import regex as re
 
 # TODO: Bug in Design classes, have to generate to fix?
 # blacklist for false positives in declaration (will not search any line including these for names to obfuscate, will also blacklist any vars in those lines)
@@ -81,6 +82,7 @@ def escapeChars(s):
 def litStrToCall(s):
     # s.group(1) returns the first subgroup '()'
     return decodeFunc+'("'+strToBytes(trimDoubleQuotes(s.group(1)))+'")'
+    # return decodeFunc+'("'+strToBytes(trimDoubleQuotes(s))+'")'
 
 # string to function call (escapes characters)
 def strToCall(s):
@@ -90,9 +92,13 @@ def strToCall(s):
     #     # s.string returns whole string sent to match
     # else:
     # s.group(1) returns the first subgroup '()'
-    if s.group("Head") != "":
+    # if s.group("Literal") != "":
+    #     return litStrToCall(s.group("ContLit"))
+    if s.group("Inter") != "":
         return s.group(0)
     if s.group("Black") != "":
+        return s.group(0)
+    if s.group("Head") != "":
         return s.group(0)
     else:
         return decodeFunc+'("'+strToBytes(trimDoubleQuotes(escapeChars(s.group("Content"))))+'")'
@@ -100,20 +106,29 @@ def strToCall(s):
 # all blacklist items get added to group 1, if strToCall sees group1 has a string it does not modify
 # TODO: redo string replacement function, needs context when string is found
 def genRegString(blacklist):
-    # regPrepend = r'(?<!(?:@|"|\$|\\))"(?!")(.*?)(?<!\\)"(?!"|\\)'
     regPrepend = r'(?<!$")(?P<Head>@|\$|)(?<!(?:"|\\))"(?!")(?P<Content>.*?)(?<!\\)"(?!"|\\)'
+    # interpreted strings
+    regInter = r'(?P<Inter>\$"(?(?=[^{}]*{).*}[^{}"]*|[^{}"]*)*")'
         # ?P<name> name the group match
+    # regLit = r'(?P<Literal>@"(?!")(?P<ContLit>.|\s)*?)(?<!")"(?!")'
     # add words as optionals to the front of regex string
-    regex = ""
+    black = ""
     for word in blacklist:
-        regex += word+'|'
-    regex = '(?P<Black>'+regex+')'+regPrepend
+        black += word+'|'
+
+    # regex = '(?:'+regLit+'|'+regInter + '|'+'(?P<Black>'+black+')'+regPrepend +')'
+    regex = '(?:'+regInter + '|'+'(?P<Black>'+black+')'+regPrepend +')'
+    # regex = '(?:'+'(?P<Black>'+black+')'+regPrepend +')'
     return regex
 
 def obfuscateStrings(code):
     # global strBlacklist
 
     obf = code
+
+    # TODO: combine literal string and regular/interpreted string regex
+    # full possible regex string
+    # (?:(?P<Inter>\$"(?(?=[^{}]*{).*}[^{}"]*|[^{}"]*)*")|(?P<Literal>@"(?!")(?P<ContLit>.|\s)*?)(?<!")"(?!")|(?<!$")(?<!(?:"|\\))"(?!")(?P<Content>.*?)(?<!\\)"(?!"|\\))
 
     # string literal @"" obfuscate
     # calls strToCall function with match-object, replaces every occurance, if occurances overlap, only one is taken since regex happens iteratively
@@ -128,7 +143,7 @@ def obfuscateStrings(code):
     obf = re.sub(regString,strToCall,obf)
         # don't capture group (?:)
     
-    # TODO: interpolated Strings $""
+    # TODO: interpolated Strings $"{...}"
 
     return obf
 
