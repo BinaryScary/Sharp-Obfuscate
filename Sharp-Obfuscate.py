@@ -332,7 +332,7 @@ def copyProj(solution):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Obfuscate C# Function,Parameter, Variable Names and Encode Strings')
     # required not needed for positional (none flag) arguments
-    parser.add_argument('filename',metavar='File',type=str)
+    parser.add_argument('filename',metavar='SolutionFile',type=str)
     # parser.add_argument('-o', metavar='OutFile',type=str)
     # parser.add_argument('-s', help='use solution file (.sln)', action='store_true')
     args = parser.parse_args()
