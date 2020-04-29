@@ -13,7 +13,7 @@ import regex as re
 blacklist = ["using", "goto", "extern","override","partial"]
 # blacklist for strings precursors (will not add string precursed with this)
 # strBlacklist = ['DllImport','DllExport','Guid','ProgId','case'] 
-strBlacklist = ['DllImport','DllExport\(','\[Guid\(','\[ProgId\(','case '] 
+strBlacklist = ['DllImport\(','DllExport\(','\[Guid\(','\[ProgId\(','case '] 
 # blacklist for function and parameter names
 funcBlacklist = ['Dispose'] 
 
