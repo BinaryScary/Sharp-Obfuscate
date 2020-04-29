@@ -13,7 +13,7 @@ import regex as re
 blacklist = ["using", "goto", "extern","override","partial"]
 # blacklist for strings precursors (will not add string precursed with this)
 # strBlacklist = ['DllImport','DllExport','Guid','ProgId','case'] 
-strBlacklist = ['DllImport\(','DllExport\(','\[Guid\(','\[ProgId\(','case '] 
+strBlacklist = ['DllImport\(','DllExport\(','\[Guid\(','\[ProgId\(','\[Option\(','case '] 
 # blacklist for function and parameter names
 funcBlacklist = ['Dispose'] 
 
@@ -37,6 +37,16 @@ def addFunc(funcLine):
         if var not in funcBlacklist:
             variables.append(var)
     return variables
+
+# parse function parameters and names
+def addBlack(funcLine):
+    match = re.findall("(?<= )(?<!new )(?<!\<)([a-zA-Z0-9_]+,|[a-zA-Z0-9_]+\)|[a-zA-Z0-9_]+\(|[a-zA-Z0-9]+\:)",funcLine)
+        # (?<= ) check if space is present without adding to match
+    variables = []
+    for variable in match:
+        var = re.sub('(,|\)|\(|\:)','',variable)
+        variables.append(var)
+    return variables
     
 
 def getNames(code):
@@ -48,7 +58,7 @@ def getNames(code):
         # blacklisted words check
         if any(word in i for word in blacklist):
             if "public" in i or "private" in i or "protected" in i:
-                varTemp = addFunc(i)
+                varTemp = addBlack(i)
                 variables = [x for x in variables if x not in varTemp]
                 blacklist = list(set().union(blacklist , varTemp))
             continue
@@ -94,6 +104,8 @@ def strToCall(s):
     # s.group(1) returns the first subgroup '()'
     # if s.group("Literal") != "":
     #     return litStrToCall(s.group("ContLit"))
+    if s.group("Const") != "" and s.group("Const") != None:
+        return s.group(0)
     if s.group("Inter") != "" and s.group("Inter") != None:
         return s.group(0)
     if s.group("Black") != "" and s.group("Black") != None:
@@ -109,6 +121,7 @@ def genRegString(blacklist):
     # interpreted strings
     regInter = r'(?P<Inter>\$"(?(?=[^{}]*{).*}[^{}"]*|[^{}"]*)*")'
         # ?P<name> name the group match
+    regConst = r'(?P<Const>const.*;)'
     # regLit = r'(?P<Literal>@"(?!")(?P<ContLit>.|\s)*?)(?<!")"(?!")'
     # add words as optionals to the front of regex string
     black = ""
@@ -116,10 +129,12 @@ def genRegString(blacklist):
         black += word+'|'
 
     # regex = '(?:'+regLit+'|'+regInter + '|'+'(?P<Black>'+black+')'+regPrepend +')'
-    regex = '(?:'+regInter + '|'+'(?P<Black>'+black+')'+regPrepend +')'
+    regex = '(?:'+regConst+'|'+regInter + '|'+'(?P<Black>'+black+')'+regPrepend +')'
+        # regex priority is left to right
     # regex = '(?:'+'(?P<Black>'+black+')'+regPrepend +')'
     return regex
 
+# TODO: single quote strings '
 def obfuscateStrings(code):
     # global strBlacklist
 
