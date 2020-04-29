@@ -15,7 +15,7 @@ blacklist = ["using", "goto", "extern","override","partial"]
 # strBlacklist = ['DllImport','DllExport','Guid','ProgId','case'] 
 strBlacklist = ['DllImport','DllExport\(','\[Guid\(','\[ProgId\(','case '] 
 # blacklist for function and parameter names
-funcBlacklist = [] 
+funcBlacklist = ['Dispose'] 
 
 # is randomly generated and added to string blacklist
 decodeFunc = "DecObfu"
@@ -29,12 +29,13 @@ def obfuWord(length=10):
 
 # parse function parameters and names
 def addFunc(funcLine):
-    match = re.findall("(?<= )(?<!new )(?<!\<)([a-zA-Z0-9_]+,|[a-zA-Z0-9_]+\)|[a-zA-Z0-9_]+\()",funcLine)
+    match = re.findall("(?<= )(?<!new )(?<!\<)([a-zA-Z0-9_]+,|[a-zA-Z0-9_]+\)|[a-zA-Z0-9_]+\(|[a-zA-Z0-9]+\:)",funcLine)
         # (?<= ) check if space is present without adding to match
     variables = []
     for variable in match:
-        if variable not in funcBlacklist:
-            variables.append(re.sub('(,|\)|\()','',variable))
+        var = re.sub('(,|\)|\(|\:)','',variable)
+        if var not in funcBlacklist:
+            variables.append(var)
     return variables
     
 
@@ -50,7 +51,6 @@ def getNames(code):
                 varTemp = addFunc(i)
                 variables = [x for x in variables if x not in varTemp]
                 blacklist = list(set().union(blacklist , varTemp))
-            # TODO: also add excluded variable declaration to blacklist
             continue
 
         # if function extract parameters & name
@@ -94,17 +94,16 @@ def strToCall(s):
     # s.group(1) returns the first subgroup '()'
     # if s.group("Literal") != "":
     #     return litStrToCall(s.group("ContLit"))
-    if s.group("Inter") != "":
+    if s.group("Inter") != "" and s.group("Inter") != None:
         return s.group(0)
-    if s.group("Black") != "":
+    if s.group("Black") != "" and s.group("Black") != None:
         return s.group(0)
-    if s.group("Head") != "":
+    if s.group("Head") != "" and s.group("Head") != None:
         return s.group(0)
-    else:
-        return decodeFunc+'("'+strToBytes(trimDoubleQuotes(escapeChars(s.group("Content"))))+'")'
+
+    return decodeFunc+'("'+strToBytes(trimDoubleQuotes(escapeChars(s.group("Content"))))+'")'
 
 # all blacklist items get added to group 1, if strToCall sees group1 has a string it does not modify
-# TODO: redo string replacement function, needs context when string is found
 def genRegString(blacklist):
     regPrepend = r'(?<!$")(?P<Head>@|\$|)(?<!(?:"|\\))"(?!")(?P<Content>.*?)(?<!\\)"(?!"|\\)'
     # interpreted strings
@@ -126,7 +125,7 @@ def obfuscateStrings(code):
 
     obf = code
 
-    # TODO: combine literal string and regular/interpreted string regex
+    # TODO: combine literal string and regular/interpreted string regex, ground work layed out but some buffer error occurs
     # full possible regex string
     # (?:(?P<Inter>\$"(?(?=[^{}]*{).*}[^{}"]*|[^{}"]*)*")|(?P<Literal>@"(?!")(?P<ContLit>.|\s)*?)(?<!")"(?!")|(?<!$")(?<!(?:"|\\))"(?!")(?P<Content>.*?)(?<!\\)"(?!"|\\))
 
@@ -143,7 +142,7 @@ def obfuscateStrings(code):
     obf = re.sub(regString,strToCall,obf)
         # don't capture group (?:)
     
-    # TODO: interpolated Strings $"{...}"
+    # TODO: interpolated Strings $"{...}" can probably get content from regex if statement
 
     return obf
 
@@ -221,6 +220,7 @@ def getCode(filenames):
             quit()
     return code
 
+# obfuscator for variable, parameter and function names
 def obfuscateNames(code,varObfuMap):
     obf = code
     for var in varObfuMap:
@@ -229,7 +229,7 @@ def obfuscateNames(code,varObfuMap):
             continue
         # check for non encapsulated word i.e: don't replace str in string
 
-        obf = re.sub("( |\)|\.|\(|\[|,|\t|~)"+var+"( |\-|\+|\.|\n|\(|\)|;|,|=|\[|\]|\t)",r"\1"+varObfuMap[var]+r"\2",obf)
+        obf = re.sub("( |\)|\.|\(|\[|,|\t|~|{|<|-|\!)"+var+"( |>|}|\-|\+|\.|\n|\(|\)|;|,|=|\[|\]|\t|\?)",r"\1"+varObfuMap[var]+r"\2",obf)
     return obf
 
 
@@ -354,7 +354,6 @@ if __name__ == "__main__":
     # parser.add_argument('-s', help='use solution file (.sln)', action='store_true')
     args = parser.parse_args()
 
-    # TODO: probably doesn't work now without solutionfile
     solution = args.filename
     filenames = []
     solution = copyProj(solution)
