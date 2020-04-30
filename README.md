@@ -1,5 +1,5 @@
 # Sharp-Obfuscate 
-## *Depricated for Sharp-Obfuscate2*
+## *Depricated for Net-Obfuscate*
 Obfuscate C# Function, Parameter, Variable Names and Encode Strings\
 Fully Evades Windows Defender and AMSI Signatures
 ```
